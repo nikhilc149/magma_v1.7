@@ -24,6 +24,8 @@ extern "C" {
 
 using ::testing::Test;
 
+extern bool hss_associated;
+
 namespace magma5g {
 
 class NgapFlowTest : public testing::Test {
@@ -34,14 +36,24 @@ class NgapFlowTest : public testing::Test {
         NULL);
 
     amf_config_init(&amf_config);
-    amf_config.plmn_support_list.plmn_support_count          = 1;
+    amf_config.plmn_support_list.plmn_support_count   = 1;
+    amf_config.plmn_support_list.plmn_support[0].plmn = {.mcc_digit2 = 2,
+                                                         .mcc_digit1 = 2,
+                                                         .mnc_digit3 = 6,
+                                                         .mcc_digit3 = 2,
+                                                         .mnc_digit2 = 5,
+                                                         .mnc_digit1 = 4};
+
     amf_config.plmn_support_list.plmn_support[0].s_nssai.sst = 0x1;
+    amf_config.served_tai.plmn_mcc[0]                        = 222;
+    amf_config.served_tai.plmn_mnc[0]                        = 456;
+    amf_config.served_tai.plmn_mnc_len[0]                    = 3;
 
     ngap_state_init(2, 2, false);
-    state = get_ngap_state(false);
-
-    ran_cp_ipaddr = bfromcstr("\xc0\xa8\x3c\x8d");
-    peerInfo      = {
+    state          = get_ngap_state(false);
+    hss_associated = true;
+    ran_cp_ipaddr  = bfromcstr("\xc0\xa8\x3c\x8d");
+    peerInfo       = {
         .instreams     = 1,
         .outstreams    = 2,
         .assoc_id      = 3,
@@ -62,6 +74,42 @@ class NgapFlowTest : public testing::Test {
   const unsigned int AMF_UE_NGAP_ID = 0x05;
   const unsigned int gNB_UE_NGAP_ID = 0x09;
 };
+
+// Unit for Ng setup request message
+TEST_F(NgapFlowTest, test_ngap_setup_request) {
+  unsigned char ngap_setup_req_hexbuf[] = {
+      0x00, 0x15, 0x00, 0x42, 0x00, 0x00, 0x04, 0x00, 0x1b, 0x00, 0x09, 0x00,
+      0x22, 0x42, 0x65, 0x50, 0x00, 0x00, 0x00, 0x01, 0x00, 0x52, 0x40, 0x18,
+      0x0a, 0x80, 0x55, 0x45, 0x52, 0x41, 0x4e, 0x53, 0x49, 0x4d, 0x2d, 0x67,
+      0x6e, 0x62, 0x2d, 0x32, 0x32, 0x32, 0x2d, 0x34, 0x35, 0x36, 0x2d, 0x31,
+      0x00, 0x66, 0x00, 0x0d, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x22, 0x42,
+      0x65, 0x00, 0x00, 0x00, 0x08, 0x00, 0x15, 0x40, 0x01, 0x40};
+
+  // Verify sctp association is successful
+  EXPECT_EQ(ngap_handle_new_association(state, &peerInfo), RETURNok);
+  // Verify number of connected gNB's is 1
+  EXPECT_EQ(state->gnbs.num_elements, 1);
+
+  // Decode the PDU
+  Ngap_NGAP_PDU_t decoded_pdu = {};
+  uint16_t length = sizeof(ngap_setup_req_hexbuf) / sizeof(unsigned char);
+
+  bstring ngap_setup_req_msg = blk2bstr(ngap_setup_req_hexbuf, length);
+
+  // Check if the pdu can be decoded
+  ASSERT_EQ(ngap_amf_decode_pdu(&decoded_pdu, ngap_setup_req_msg), RETURNok);
+
+  sctp_stream_id_t stream_id = 0;
+
+  // check if Ng setup request message is handled successfully
+  EXPECT_EQ(
+      ngap_amf_handle_message(
+          state, peerInfo.assoc_id, stream_id, &decoded_pdu),
+      RETURNok);
+
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_Ngap_NGAP_PDU, &decoded_pdu);
+  bdestroy(ngap_setup_req_msg);
+}
 
 // Unit for Initial UE message
 TEST_F(NgapFlowTest, initial_ue_message_sunny_day) {

@@ -746,22 +746,7 @@ typedef int (*ngap_message_handler_t)(
  \param sptr Dereferenced pointer to the structure to encode
  @returns size in bytes encded on success or 0 on failure
  **/
-
 ssize_t ngap_generate_successful_outcome(
-    uint8_t** buffer, uint32_t* length, Ngap_ProcedureCode_t procedureCode,
-    Ngap_Criticality_t criticality, asn_TYPE_descriptor_t* td, void* sptr);
-
-/** \brief Encode an initiating message
- \param buffer pointer to buffer in which data will be encoded
- \param length pointer to the length of buffer
- \param procedureCode Procedure code for the message
- \param criticality Criticality of the message
- \param td ASN1C type descriptor of the sptr
- \param sptr Dereferenced pointer to the structure to encode
- @returns size in bytes encded on success or 0 on failure
- **/
-
-ssize_t ngap_generate_initiating_message(
     uint8_t** buffer, uint32_t* length, Ngap_ProcedureCode_t procedureCode,
     Ngap_Criticality_t criticality, asn_TYPE_descriptor_t* td, void* sptr);
 
